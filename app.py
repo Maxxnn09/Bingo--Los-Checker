@@ -4,51 +4,9 @@ import pandas as pd
 # Konfiguration für mobile Ansicht
 st.set_page_config(page_title="Bingo Live-Prüfer", page_icon="🎰", layout="centered")
 
-# DER DEFINITIVE MOBIL-HACK: Zwingt echte Streamlit-Elemente ohne Scrollen aufs Handy
-st.markdown("""
-<style>
-    /* Spalten-Blöcke bilden eine feste horizontale Reihe ohne Umbruch */
-    [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 2px !important;
-        width: 100% !important;
-    }
-    /* Teilt die Spalten mathematisch exakt auf 5 gleich große Stücke (je 20%) auf */
-    [data-testid="column"] {
-        flex: 1 1 0% !important;
-        min-width: 0px !important;
-        width: 20% !important;
-    }
-    /* Macht die echten Streamlit-Eingabefelder super schmal fürs Handy */
-    [data-testid="column"] input {
-        padding: 4px 1px !important;
-        font-size: 13px !important;
-        text-align: center !important;
-        height: 34px !important;
-        box-sizing: border-box !important;
-    }
-    /* Macht die echten Streamlit-Ziehungsbuttons flach und fingerfreundlich */
-    [data-testid="column"] button {
-        padding: 4px 1px !important;
-        font-size: 11px !important;
-        height: 28px !important;
-        margin: 1px 0px !important;
-        width: 100% !important;
-    }
-    /* Entfernt die Pfeile in den Zahlenfeldern für maximalen Platz */
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { 
-        -webkit-appearance: none; 
-        margin: 0; 
-    }
-</style>
-""", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; font-size: 22px; margin-bottom: 20px;'>🎰 BINGO! Live-Prüfer</h2>", unsafe_allow_html=True)
 
-st.markdown("<h2 style='font-size: 24px; text-align: center; margin-bottom: 25px;'>🎰 BINGO! Live-Prüfer</h2>", unsafe_allow_html=True)
-
-# Speicher für die Lose und gezogenen Zahlen im Hintergrund
+# Speicher im Hintergrund anlegen
 if "lose" not in st.session_state:
     st.session_state.lose = []
 if "gezogene_zahlen" not in st.session_state:
@@ -57,7 +15,7 @@ if "gezogene_zahlen" not in st.session_state:
 tab1, tab2 = st.tabs(["📋 Meine Lose", "📺 Live-Ziehung & Abgleich"])
 
 # ==========================================
-# REITER 1: MEINE LOSE (Eintragen & Speichern)
+# REITER 1: MANUELLE LOSEINGABE (PROFI-LOOK)
 # ==========================================
 with tab1:
     if len(st.session_state.lose) > 0:
@@ -67,87 +25,98 @@ with tab1:
                 df_visual = pd.DataFrame(los['matrix'], columns=["B", "I", "N", "G", "O"])
                 st.table(df_visual)
         st.write("---")
-    else:
-        st.info("Noch keine Lose gespeichert. Trage unten dein erstes Los ein!")
 
     st.subheader("➕ Neues Los hinzufügen")
     
     col_ser, col_los = st.columns(2)
     with col_ser:
-        serien_nr = st.text_input("Seriennummer", placeholder="z.B. 1109", key="ser_input")
+        serien_nr = st.text_input("Seriennummer", placeholder="z.B. 1109", key="sn_in")
     with col_los:
-        los_nr = st.text_input("Losnummer", placeholder="z.B. 21416", key="los_input")
+        los_nr = st.text_input("Losnummer", placeholder="z.B. 21416", key="ln_in")
         
-    st.write("**Die 25 Zahlen des Spielfelds (5x5 Raster):**")
+    # Geniale Texteingabe: Schont die Nerven und spart Platz auf dem Handy!
+    zahlen_text = st.text_area(
+        "Trage die 25 Zahlen deines Loses ein (mit Komma getrennt):",
+        placeholder="6, 20, 39, 47, 72, 7, 28, 40, 59, 64, ...",
+        help="Einfach alle 25 Zahlen von links nach rechts, Reihe für Reihe eingeben."
+    )
     
-    cols_header = st.columns(5)
-    for idx, b in enumerate(["B", "I", "N", "G", "O"]):
-        cols_header[idx].markdown(f"<p style='text-align: center; font-weight: bold; background: #f0f2f6; margin: 0; padding: 2px 0; border-radius: 4px;'>{b}</p>", unsafe_allow_html=True)
-    
-    matrix = []
-    for i in range(5):
-        cols = st.columns(5)
-        row_values = []
-        for j in range(5):
-            val = cols[j].number_input(
-                f"R{i}S{j}", min_value=1, max_value=75, value=1, 
-                key=f"cell_{i}_{j}", label_visibility="collapsed"
-            )
-            row_values.append(val)
-        matrix.append(row_values)
-        
-    if st.button("➕ Los jetzt speichern", use_container_width=True, key="save_los_btn"):
-        if serien_nr and los_nr:
-            st.session_state.lose.append({
-                "serien_nr": serien_nr,
-                "los_nr": los_nr,
-                "matrix": matrix
-            })
-            st.success(f"🎉 Los {los_nr} erfolgreich gespeichert!")
-            st.rerun()
+    if st.button("➕ Los jetzt speichern", use_container_width=True):
+        if serien_nr and los_nr and zahlen_text:
+            try:
+                # Text in eine saubere Zahlenliste umwandeln
+                rohe_zahlen = [int(z.strip()) for z in zahlen_text.split(",") if z.strip().isdigit()]
+                
+                if len(rohe_zahlen) != 25:
+                    st.error(f"Ein Bingo-Los braucht genau 25 Zahlen! (Du hast {len(rohe_zahlen)} eingegeben)")
+                else:
+                    # Die 25 Zahlen in ein perfektes 5x5 Raster aufteilen
+                    neue_matrix = [rohe_zahlen[i*5:(i+1)*5] for i in range(5)]
+                    
+                    st.session_state.lose.append({
+                        "serien_nr": serien_nr,
+                        "los_nr": los_nr,
+                        "matrix": neue_matrix
+                    })
+                    st.success(f"🎉 Los {los_nr} erfolgreich gespeichert!")
+                    st.rerun()
+            except Exception as e:
+                st.error("Fehler: Bitte trenne die Zahlen nur mit echten Kommas!")
         else:
-            st.error("Bitte Serien- und Losnummer eingeben.")
+            st.error("Bitte fülle die Seriennummer, Losnummer und alle Zahlen aus.")
 
 # ==========================================
-# REITER 2: LIVE-ZIEHUNG & BINGO-PRÜFUNG
+# REITER 2: LIVE-ZIEHUNG (PERFEKTE BUTTONS)
 # ==========================================
 with tab2:
     st.subheader("📺 Ziehungs-Spielfeld")
-    st.write("Klicke auf die Zahlen, um sie zu markieren:")
     
-    buchstaben = ["B", "I", "N", "G", "O"]
-    # Startwerte für die 5 Bingo-Spalten (1, 16, 31, 46, 61)
-    von_bis = [1, 16, 31, 46, 61]
+    # Grid-Hack für das Ziehungsfeld (Zwingt Buttons auf Handys nebeneinander)
+    st.markdown("""
+    <style>
+        .board-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; width: 100%; box-sizing: border-box; }
+        .board-hdr { background: #1E88E5; color: white; text-align: center; font-weight: bold; padding: 4px 0; font-size: 13px; border-radius: 3px; }
+        .mobile-btn { width: 100%; background: #f0f2f6; border: 1px solid #ccc; padding: 6px 0; font-size: 11px; font-weight: bold; text-align: center; border-radius: 4px; cursor: pointer; }
+        .mobile-btn.active { background: #E53935 !important; color: white !important; border: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
     
-    cols_board = st.columns(5)
-    for spalte_idx in range(5):
-        with cols_board[spalte_idx]:
-            st.markdown(f"<p style='text-align: center; font-weight: bold; color: white; background-color: #1E88E5; margin: 0; padding: 4px 0; border-radius: 4px; font-size: 14px;'>{buchstaben[spalte_idx]}</p>", unsafe_allow_html=True)
-            
-            start_wert = von_bis[spalte_idx]
-            for zeile in range(15):
-                zahl = start_wert + zeile
-                ist_aktiv = zahl in st.session_state.gezogene_zahlen
-                
-                btn_label = f"🎯 {zahl}" if ist_aktiv else f"{zahl}"
-                btn_type = "primary" if ist_aktiv else "secondary"
-                
-                if st.button(btn_label, key=f"native_btn_{zahl}", type=btn_type, use_container_width=True):
-                    if ist_aktiv:
-                        st.session_state.gezogene_zahlen.remove(zahl)
-                    else:
-                        st.session_state.gezogene_zahlen.add(zahl)
-                    st.rerun()
+    # Verarbeitet Klicks aus dem mobilen HTML-Feld unblockierbar via URL-Wechsel
+    query = st.query_params
+    if "z" in query:
+        geklickte_zahl = int(query["z"])
+        if geklickte_zahl in st.session_state.gezogene_zahlen:
+            st.session_state.gezogene_zahlen.remove(geklickte_zahl)
+        else:
+            st.session_state.gezogene_zahlen.add(geklickte_zahl)
+        st.query_params.clear()
+        st.rerun()
 
+    # Wir bauen das Spielfeld als reines HTML-Grid. Das passt sich IMMER zu 100% ohne Scrollen an!
+    von_bis = [1, 16, 31, 46, 61]
+    html_board = '<div class="board-container">'
+    for b in ["B", "I", "N", "G", "O"]:
+        html_board += f'<div class="board-hdr">{b}</div>'
+        
+    for r in range(15):
+        for s in range(5):
+            zahl = von_bis[s] + r
+            ist_aktiv = zahl in st.session_state.gezogene_zahlen
+            cls = "mobile-btn active" if ist_aktiv else "mobile-btn"
+            label = f"🎯{zahl}" if ist_aktiv else str(zahl)
+            html_board += f'<button class="{cls}" onclick="parent.location.href=\'?z={zahl}\'">{label}</button>'
+    html_board += '</div>'
+    
+    components.html(html_board, height=530, scrolling=False)
     st.write("---")
     
+    # LIVE-ABGLEICH DARUNTER
     if len(st.session_state.lose) == 0:
-        st.warning("Hinzugefügte Lose werden hier live abgeglichen.")
+        st.warning("Füge im ersten Reiter Lose hinzu, um den Live-Abgleich zu sehen.")
     else:
         st.write("### 🔍 Live-Abgleich deiner Lose:")
         for los in st.session_state.lose:
             mat = los['matrix']
-            
             z_treffer = [0, 0, 0, 0, 0]
             s_treffer = [0, 0, 0, 0, 0]
             d1_treffer, d2_treffer = 0, 0
@@ -158,7 +127,6 @@ with tab2:
                 for j in range(5):
                     zahl = mat[i][j]
                     ist_gezogen = zahl in st.session_state.gezogene_zahlen
-                    
                     if ist_gezogen:
                         row_display.append(f"✅ {zahl}")
                         z_treffer[i] += 1
@@ -170,7 +138,6 @@ with tab2:
                 display_matrix.append(row_display)
             
             hat_bingo = (5 in z_treffer) or (5 in s_treffer) or (d1_treffer == 5) or (d2_treffer == 5)
-            
             st.markdown(f"**🎫 Los {los['los_nr']} (Serie: {los['serien_nr']})**")
             df = pd.DataFrame(display_matrix, columns=["B", "I", "N", "G", "O"])
             st.table(df)
@@ -178,3 +145,4 @@ with tab2:
             if hat_bingo:
                 st.balloons()
                 st.success(f"🚨🚨 BINGO!!! Herzlichen Glückwunsch bei Los {los['los_nr']}! 🚨🚨")
+
